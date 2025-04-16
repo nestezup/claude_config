@@ -150,7 +150,7 @@ main {
 }
 
 .add-key {
-  margin: 10px;
+  margin: 10px 10px 30px 10px;
   background-color: var(--light-gray);
   color: var(--text-color);
   border: 1px solid var(--border-color);
@@ -184,7 +184,7 @@ main {
 }
 
 .apply-button {
-  margin: 10px;
+  margin: 10px 10px 30px 10px;
   align-self: flex-end;
 }
 
