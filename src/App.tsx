@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { open } from '@tauri-apps/api/dialog';
+import { open, save } from '@tauri-apps/api/dialog';
 import { readTextFile, writeTextFile } from '@tauri-apps/api/fs';
 
 // Define interfaces for our data structure
@@ -92,6 +92,12 @@ function App() {
   const addNewKey = () => {
     const newKey = prompt('Enter a name for the new configuration:');
     if (newKey && newKey.trim() !== '') {
+      // 이미 존재하는 키인지 확인
+      if (configStore[newKey]) {
+        alert(`Configuration key "${newKey}" already exists.`);
+        return;
+      }
+      
       const newConfig = {
         ...configStore,
         [newKey]: {}
@@ -100,6 +106,22 @@ function App() {
       setConfigStore(newConfig);
       setSelectedKey(newKey);
       setJsonValue('{}');
+    }
+  };
+
+  // Delete a key from the configuration
+  const deleteKey = (key: string) => {
+    if (confirm(`Are you sure you want to delete the "${key}" configuration?`)) {
+      const newConfigStore = { ...configStore };
+      delete newConfigStore[key];
+      
+      setConfigStore(newConfigStore);
+      
+      // 현재 선택된 키가 삭제된 경우 선택 해제
+      if (selectedKey === key) {
+        setSelectedKey(null);
+        setJsonValue('');
+      }
     }
   };
 
@@ -155,18 +177,22 @@ function App() {
   // Export configuration set
   const exportConfig = async () => {
     try {
-      const savePath = await open({
+      // 저장 대화상자 열기
+      let filePath = await save({
         filters: [{
           name: 'JSON Config',
           extensions: ['json']
         }],
-        directory: false,
-        multiple: false,
         defaultPath: 'claude_config_export.json'
       });
       
-      if (savePath) {
-        await writeTextFile(savePath as string, JSON.stringify(configStore, null, 2));
+      if (filePath) {
+        // 확장자가 없으면 .json 추가
+        if (!filePath.toLowerCase().endsWith('.json')) {
+          filePath = `${filePath}.json`;
+        }
+        
+        await writeTextFile(filePath, JSON.stringify(configStore, null, 2));
         alert('Configuration set exported successfully!');
       }
     } catch (err) {
@@ -190,6 +216,18 @@ function App() {
         try {
           const parsed = JSON.parse(content);
           setConfigStore(parsed);
+          
+          // UI 업데이트
+          if (Object.keys(parsed).length > 0) {
+            // 첫 번째 키 선택
+            const firstKey = Object.keys(parsed)[0];
+            setSelectedKey(firstKey);
+            setJsonValue(JSON.stringify(parsed[firstKey], null, 2));
+          } else {
+            setSelectedKey(null);
+            setJsonValue('');
+          }
+          
           alert('Configuration set imported successfully!');
         } catch (e) {
           setError(`Failed to parse JSON: ${e}`);
@@ -227,9 +265,23 @@ function App() {
                   <div 
                     key={key}
                     className={`key-item ${selectedKey === key ? 'selected' : ''}`}
-                    onClick={() => handleKeySelect(key)}
                   >
-                    {key}
+                    <span 
+                      className="key-name"
+                      onClick={() => handleKeySelect(key)}
+                    >
+                      {key}
+                    </span>
+                    <button 
+                      className="delete-key"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteKey(key);
+                      }}
+                      title="Delete this configuration"
+                    >
+                      ✕
+                    </button>
                   </div>
                 ))}
               </div>
@@ -272,6 +324,187 @@ function App() {
           </div>
         )}
       </main>
+
+      <style>{`
+        .container {
+          display: flex;
+          flex-direction: column;
+          height: 100vh;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+        }
+        
+        header {
+          padding: 1rem;
+          background-color: #f5f5f5;
+          border-bottom: 1px solid #ddd;
+        }
+        
+        h1 {
+          margin: 0 0 1rem 0;
+          font-size: 1.5rem;
+        }
+        
+        .file-controls {
+          display: flex;
+          align-items: center;
+          margin-bottom: 0.5rem;
+        }
+        
+        .file-path {
+          margin-left: 0.5rem;
+          font-size: 0.9rem;
+          color: #666;
+        }
+        
+        .loading {
+          margin-left: 0.5rem;
+          font-size: 0.9rem;
+          color: #666;
+        }
+        
+        .error {
+          margin-left: 0.5rem;
+          font-size: 0.9rem;
+          color: #d32f2f;
+        }
+        
+        .set-controls {
+          display: flex;
+          gap: 0.5rem;
+        }
+        
+        button {
+          padding: 0.5rem 1rem;
+          background-color: #2196f3;
+          color: white;
+          border: none;
+          border-radius: 4px;
+          cursor: pointer;
+          font-size: 0.9rem;
+        }
+        
+        button:hover {
+          background-color: #1976d2;
+        }
+        
+        button:disabled {
+          background-color: #bbdefb;
+          cursor: not-allowed;
+        }
+        
+        main {
+          flex: 1;
+          display: flex;
+          overflow: hidden;
+        }
+        
+        .editor-layout {
+          display: flex;
+          width: 100%;
+          height: 100%;
+        }
+        
+        .keys-panel {
+          width: 250px;
+          border-right: 1px solid #ddd;
+          display: flex;
+          flex-direction: column;
+        }
+        
+        .keys-list {
+          flex: 1;
+          overflow-y: auto;
+          padding: 0.5rem;
+        }
+        
+        .key-item {
+          padding: 0.5rem;
+          margin-bottom: 0.25rem;
+          border-radius: 4px;
+          cursor: pointer;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+        
+        .key-item:hover {
+          background-color: #f5f5f5;
+        }
+        
+        .key-item.selected {
+          background-color: #e3f2fd;
+        }
+        
+        .key-name {
+          flex: 1;
+        }
+        
+        .delete-key {
+          background: none;
+          color: #d32f2f;
+          border: none;
+          padding: 0.25rem;
+          font-size: 0.8rem;
+          cursor: pointer;
+          display: none;
+        }
+        
+        .key-item:hover .delete-key {
+          display: block;
+        }
+        
+        .add-key {
+          margin: 0.5rem;
+        }
+        
+        .json-panel {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          padding: 0.5rem;
+        }
+        
+        .json-editor {
+          flex: 1;
+          font-family: 'Courier New', Courier, monospace;
+          padding: 0.5rem;
+          border: 1px solid #ddd;
+          border-radius: 4px;
+          resize: none;
+          font-size: 0.9rem;
+        }
+        
+        .apply-button {
+          margin-top: 0.5rem;
+          background-color: #4caf50;
+        }
+        
+        .apply-button:hover {
+          background-color: #388e3c;
+        }
+        
+        .no-selection {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          height: 100%;
+          color: #666;
+        }
+        
+        .welcome {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          height: 100%;
+          text-align: center;
+        }
+        
+        .welcome p {
+          margin-bottom: 1rem;
+          color: #666;
+        }
+      `}</style>
     </div>
   );
 }
