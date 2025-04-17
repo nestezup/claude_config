@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { open, save } from '@tauri-apps/api/dialog';
 import { readTextFile, writeTextFile } from '@tauri-apps/api/fs';
+import { message } from '@tauri-apps/api/dialog';
+import { resolve } from '@tauri-apps/api/path';
 
 // Define interfaces for our data structure
 interface ConfigValue {
@@ -33,6 +35,53 @@ function App() {
   const [jsonValue, setJsonValue] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [editingKey, setEditingKey] = useState<string | null>(null);
+  const [tempKeyName, setTempKeyName] = useState<string>("");
+
+  // 앱 config 파일 경로를 구한다 (절대경로 사용)
+  const getAppConfigPath = async () => {
+    return await resolve('app_config.json');
+  };
+
+  // 파일 존재 확인 함수 (절대경로 사용)
+  async function existsFile(path: string) {
+    try {
+      await readTextFile(path);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  // 앱 실행 시 config 자동 로드
+  useEffect(() => {
+    (async () => {
+      try {
+        const configPath = await getAppConfigPath();
+        const exists = await existsFile(configPath);
+        if (exists) {
+          const content = await readTextFile(configPath);
+          const parsed = JSON.parse(content);
+          setConfigStore(parsed);
+        }
+      } catch (e) {
+        // 파일 없거나 파싱 실패 시 무시(기본값)
+      }
+    })();
+  }, []);
+
+  // configStore가 바뀔 때마다 자동 저장
+  useEffect(() => {
+    (async () => {
+      try {
+        const configPath = await getAppConfigPath();
+        await writeTextFile(configPath, JSON.stringify(configStore, null, 2));
+      } catch (e) {
+        // 저장 실패 시 무시(경고만)
+        console.warn('app_config.json 저장 실패:', e);
+      }
+    })();
+  }, [configStore]);
 
   // Function to select config file using Tauri dialog API
   const selectConfigFile = async () => {
@@ -64,6 +113,14 @@ function App() {
         try {
           const parsed = JSON.parse(content);
           setConfigStore(parsed);
+          
+          // 첫 번째 키 선택
+          if (Object.keys(parsed).length > 0) {
+            const firstKey = Object.keys(parsed)[0];
+            setSelectedKey(firstKey);
+            // 전체 JSON 구조 유지
+            setJsonValue(JSON.stringify(parsed, null, 2));
+          }
         } catch (e) {
           setError(`Failed to parse JSON: ${e}`);
         }
@@ -75,6 +132,14 @@ function App() {
         try {
           const parsed = JSON.parse(content);
           setConfigStore(parsed);
+          
+          // 첫 번째 키 선택
+          if (Object.keys(parsed).length > 0) {
+            const firstKey = Object.keys(parsed)[0];
+            setSelectedKey(firstKey);
+            // 전체 JSON 구조 유지
+            setJsonValue(JSON.stringify(parsed, null, 2));
+          }
         } catch (e) {
           setError(`Failed to parse JSON: ${e}`);
         }
@@ -90,23 +155,17 @@ function App() {
 
   // Add a new key to the configuration
   const addNewKey = () => {
-    const newKey = prompt('Enter a name for the new configuration:');
-    if (newKey && newKey.trim() !== '') {
-      // 이미 존재하는 키인지 확인
-      if (configStore[newKey]) {
-        alert(`Configuration key "${newKey}" already exists.`);
-        return;
-      }
-      
-      const newConfig = {
-        ...configStore,
-        [newKey]: {}
-      };
-      
-      setConfigStore(newConfig);
-      setSelectedKey(newKey);
-      setJsonValue('{}');
+    let baseName = "NewConfig";
+    let newKey = baseName;
+    let counter = 1;
+    while (configStore[newKey]) {
+      newKey = `${baseName}_${counter++}`;
     }
+    const updatedStore = { ...configStore, [newKey]: {} };
+    setConfigStore(updatedStore);
+    setSelectedKey(newKey);
+    setJsonValue(JSON.stringify({}, null, 2));
+    setEditingKey(newKey); // 이름 즉시 편집 모드로
   };
 
   // Delete a key from the configuration
@@ -125,31 +184,139 @@ function App() {
     }
   };
 
+  // Rename a key in the configuration
+  const renameKey = async (oldKey: string) => {
+    try {
+      // 사용자에게 새 이름 입력 받기
+      const newName = prompt(`Enter new name for "${oldKey}":`, oldKey);
+      
+      if (!newName || newName.trim() === '' || newName === oldKey) {
+        return; // 취소하거나 같은 이름을 입력한 경우
+      }
+      
+      // 이미 존재하는 키인지 확인
+      if (configStore[newName]) {
+        await message(`Configuration key "${newName}" already exists.`, {
+          title: 'Error',
+          type: 'error'
+        });
+        return;
+      }
+      
+      // 새 키로 복사하고 이전 키 삭제
+      const updatedStore = {...configStore};
+      updatedStore[newName] = {...updatedStore[oldKey]};
+      delete updatedStore[oldKey];
+      
+      // 상태 업데이트
+      setConfigStore(updatedStore);
+      setSelectedKey(newName);
+      setJsonValue(JSON.stringify(updatedStore[newName], null, 2));
+    } catch (error) {
+      console.error("Error renaming key:", error);
+      await message(`Failed to rename configuration: ${error}`, {
+        title: 'Error',
+        type: 'error'
+      });
+    }
+  };
+
   // Handle selecting a key
   const handleKeySelect = (key: string) => {
     setSelectedKey(key);
     try {
-      setJsonValue(JSON.stringify(configStore[key], null, 2));
+      // 현재 선택된 키의 값을 가져와서 표시
+      const currentValue = configStore[key] || {};
+      setJsonValue(JSON.stringify(currentValue, null, 2));
     } catch (e) {
       setJsonValue('{}');
     }
   };
 
-  // Handle JSON text changes
+  // 키 이름 더블클릭 시 편집 모드
+  const handleKeyDoubleClick = (key: string) => {
+    setEditingKey(key);
+  };
+
+  // 키 이름 입력 변경
+  const handleKeyNameChange = (e: React.ChangeEvent<HTMLInputElement>, oldKey: string) => {
+    const newKey = e.target.value;
+    // 임시로 상태에 저장(바로 바꾸지 않음)
+    setTempKeyName(newKey);
+  };
+
+  // 키 이름 입력 완료(엔터/포커스 아웃)
+  const handleKeyNameBlur = (oldKey: string) => {
+    let newKey = tempKeyName.trim() || oldKey;
+    if (newKey !== oldKey && configStore[newKey]) {
+      alert("이미 존재하는 이름입니다.");
+      setEditingKey(null);
+      setTempKeyName("");
+      return;
+    }
+    if (newKey !== oldKey) {
+      const updatedStore: any = { ...configStore };
+      updatedStore[newKey] = updatedStore[oldKey];
+      delete updatedStore[oldKey];
+      setConfigStore(updatedStore);
+      setSelectedKey(newKey);
+    }
+    setEditingKey(null);
+    setTempKeyName("");
+  };
+
+  // Handle double click on key item to rename
+  const handleKeyRename = (key: string) => {
+    renameKey(key);
+  };
+
+  // JSON 에디터 입력 변경 시 자동 저장 (수정: 입력값 전체를 현재 key에만 저장)
   const handleJsonChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setJsonValue(e.target.value);
-    
     try {
       const parsed = JSON.parse(e.target.value);
       if (selectedKey) {
-        // Update in memory
+        setConfigStore({
+          ...configStore,
+          [selectedKey]: parsed // 전체 오브젝트를 해당 key의 값에만 저장!
+        });
+      }
+    } catch {
+      // Invalid JSON, 임시로 상태만 유지 (configStore에는 반영하지 않음)
+    }
+  };
+
+  // Apply Changes 버튼도 동일하게 동작하도록 보장
+  const applyJsonChanges = () => {
+    try {
+      const parsed = JSON.parse(jsonValue);
+      if (selectedKey) {
         setConfigStore({
           ...configStore,
           [selectedKey]: parsed
         });
       }
     } catch (e) {
-      // Invalid JSON, don't update
+      alert(`Invalid JSON: ${e}`);
+    }
+  };
+
+  // 실제 파일에 반영(저장) - change config file 버튼 (수정: 선택한 버튼의 값만 저장)
+  const applyConfigToFile = async () => {
+    if (!selectedFile) {
+      alert('변경할 대상 파일을 먼저 선택하세요.');
+      return;
+    }
+    if (!selectedKey) {
+      alert('저장할 항목을 먼저 선택하세요.');
+      return;
+    }
+    try {
+      // 선택한 key의 값만 저장
+      await writeTextFile(selectedFile, JSON.stringify(configStore[selectedKey], null, 2));
+      alert('설정이 파일에 성공적으로 저장되었습니다!');
+    } catch (e) {
+      alert('파일 저장 실패: ' + e);
     }
   };
 
@@ -222,10 +389,11 @@ function App() {
             // 첫 번째 키 선택
             const firstKey = Object.keys(parsed)[0];
             setSelectedKey(firstKey);
-            setJsonValue(JSON.stringify(parsed[firstKey], null, 2));
+            // 전체 JSON 구조 유지
+            setJsonValue(JSON.stringify(parsed, null, 2));
           } else {
             setSelectedKey(null);
-            setJsonValue('');
+            setJsonValue('{}');
           }
           
           alert('Configuration set imported successfully!');
@@ -324,12 +492,23 @@ function App() {
                     key={key}
                     className={`key-item ${selectedKey === key ? 'selected' : ''}`}
                   >
-                    <span 
-                      className="key-name"
-                      onClick={() => handleKeySelect(key)}
-                    >
-                      {key}
-                    </span>
+                    {editingKey === key ? (
+                      <input
+                        value={tempKeyName || key}
+                        onChange={e => handleKeyNameChange(e, key)}
+                        onBlur={() => handleKeyNameBlur(key)}
+                        onKeyDown={e => { if (e.key === 'Enter') handleKeyNameBlur(key); }}
+                        autoFocus
+                      />
+                    ) : (
+                      <span 
+                        className="key-name"
+                        onClick={() => handleKeySelect(key)}
+                        onDoubleClick={() => handleKeyDoubleClick(key)}
+                      >
+                        {key}
+                      </span>
+                    )}
                     <button 
                       className="delete-key"
                       onClick={(e) => {
@@ -343,7 +522,13 @@ function App() {
                   </div>
                 ))}
               </div>
-              <button className="add-key" onClick={addNewKey}>+ Add</button>
+              <button 
+                className="add-key" 
+                onClick={() => addNewKey()}
+                type="button"
+              >
+                + Add
+              </button>
             </div>
             
             <div className="json-panel">
@@ -360,10 +545,16 @@ function App() {
                   />
                   <button 
                     className="apply-button"
-                    onClick={applyConfig}
+                    onClick={applyJsonChanges}
                     disabled={!selectedFile || isLoading}
                   >
-                    ✔ Apply to Config File
+                    ✔ Apply Changes
+                  </button>
+                  <button 
+                    className="apply-config-btn"
+                    onClick={applyConfigToFile}
+                  >
+                    change config file
                   </button>
                 </>
               ) : (
@@ -487,6 +678,7 @@ function App() {
           justify-content: space-between;
           align-items: center;
           background-color: #e8f4fc;
+          border: 1px solid #bbdefb;
         }
         
         .key-item:hover {
@@ -499,6 +691,8 @@ function App() {
         
         .key-name {
           flex: 1;
+          font-weight: 500;
+          color: #0d47a1;
         }
         
         .delete-key {
@@ -566,6 +760,20 @@ function App() {
         
         .apply-button:hover {
           background-color: #388e3c;
+        }
+        
+        .apply-config-btn {
+          margin-top: 1rem;
+          background: #1976d2;
+          color: #fff;
+          border: none;
+          padding: 0.5rem 1.2rem;
+          border-radius: 5px;
+          cursor: pointer;
+        }
+        
+        .apply-config-btn:hover {
+          background: #125199;
         }
         
         .no-selection {
