@@ -33,9 +33,9 @@
         "renameFile": true,
         "exists": true,
         "scope": [
-          ".",
-          "./app_config.json",
-          "/Users/nest/Documents/claude_config/app_config.json"
+          "$RESOURCE/editor_settings.json",
+          "$RESOURCE",
+          "$RESOURCE/*"
         ]
       },
       "path": {
