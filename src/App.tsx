@@ -238,21 +238,79 @@ function App() {
     }
   };
 
+  // Add a new JSON configuration file
+  const addJsonConfig = async () => {
+    try {
+      // 파일 선택 대화상자 열기
+      const filePath = await open({
+        filters: [{
+          name: 'JSON Config',
+          extensions: ['json']
+        }],
+        multiple: false
+      });
+      
+      if (filePath) {
+        const content = await readTextFile(filePath as string);
+        try {
+          // JSON 파싱
+          const parsed = JSON.parse(content);
+          
+          // 파일 이름에서 확장자 제거하여 키 이름으로 사용
+          let fileName = '';
+          if (typeof filePath === 'string') {
+            const pathParts = filePath.split(/[/\\]/);
+            const lastPart = pathParts[pathParts.length - 1];
+            fileName = lastPart.replace(/\.json$/, '');
+          } else {
+            // 기본 이름
+            fileName = `config_${Object.keys(configStore).length + 1}`;
+          }
+          
+          // 이미 같은 이름의 키가 있는지 확인
+          let keyName = fileName;
+          let counter = 1;
+          while (configStore[keyName]) {
+            keyName = `${fileName}_${counter}`;
+            counter++;
+          }
+          
+          // 설정 스토어에 추가
+          const newConfigStore = {
+            ...configStore,
+            [keyName]: parsed
+          };
+          
+          setConfigStore(newConfigStore);
+          setSelectedKey(keyName);
+          setJsonValue(JSON.stringify(parsed, null, 2));
+          
+          alert(`Added new configuration "${keyName}"`);
+        } catch (e) {
+          setError(`Failed to parse JSON: ${e}`);
+        }
+      }
+    } catch (err) {
+      setError(`Failed to add JSON configuration: ${err}`);
+    }
+  };
+
   return (
     <div className="container">
       <header>
         <h1>Claude Config Editor</h1>
         <div className="file-controls">
           <button onClick={selectConfigFile} disabled={isLoading}>
-            📁 {selectedFile ? 'Change config file' : 'Select config file'}
+            {selectedFile ? 'Change config file' : 'Select config file'}
           </button>
           {selectedFile && <span className="file-path">{selectedFile}</span>}
           {isLoading && <span className="loading">Loading...</span>}
           {error && <span className="error">{error}</span>}
         </div>
         <div className="set-controls">
-          <button onClick={exportConfig}>📤 Export Config Set</button>
-          <button onClick={importConfig}>📥 Import Config Set</button>
+          <button onClick={exportConfig}>Export Config Set</button>
+          <button onClick={importConfig}>Import Config Set</button>
+          <button onClick={addJsonConfig}>Add JSON File</button>
         </div>
       </header>
 
@@ -291,6 +349,9 @@ function App() {
             <div className="json-panel">
               {selectedKey ? (
                 <>
+                  <div className="json-header">
+                    <h3>{selectedKey}</h3>
+                  </div>
                   <textarea 
                     className="json-editor"
                     value={jsonValue}
@@ -319,7 +380,7 @@ function App() {
             <p>Welcome to Claude Config Editor</p>
             <p>Start by selecting a Claude configuration file</p>
             <button onClick={selectConfigFile}>
-              📁 Select config file
+              Select config file
             </button>
           </div>
         )}
@@ -425,14 +486,15 @@ function App() {
           display: flex;
           justify-content: space-between;
           align-items: center;
+          background-color: #e8f4fc;
         }
         
         .key-item:hover {
-          background-color: #f5f5f5;
+          background-color: #d0e8f7;
         }
         
         .key-item.selected {
-          background-color: #e3f2fd;
+          background-color: #bbdefb;
         }
         
         .key-name {
@@ -455,6 +517,16 @@ function App() {
         
         .add-key {
           margin: 0.5rem;
+          width: calc(100% - 1rem);
+          text-align: center;
+          background-color: #f5f5f5;
+          color: #333;
+          border: 1px solid #ddd;
+          padding: 0.7rem;
+        }
+        
+        .add-key:hover {
+          background-color: #e0e0e0;
         }
         
         .json-panel {
@@ -462,6 +534,19 @@ function App() {
           display: flex;
           flex-direction: column;
           padding: 0.5rem;
+        }
+        
+        .json-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 0.5rem;
+        }
+        
+        .json-header h3 {
+          margin: 0;
+          font-size: 1.1rem;
+          color: #333;
         }
         
         .json-editor {
