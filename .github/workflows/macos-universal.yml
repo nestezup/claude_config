@@ -36,50 +36,59 @@ jobs:
           
           # 디버깅: 타겟 디렉토리 구조 확인
           echo "Checking target directory structure..."
-          ls -la src-tauri/target/x86_64-apple-darwin/release/bundle/
-          ls -la src-tauri/target/x86_64-apple-darwin/release/bundle/macos/
+          find src-tauri/target -type d -name "*.app" | sort
           
-          # 앱 이름 얻기 (경로 수정)
-          APPNAME=$(ls src-tauri/target/x86_64-apple-darwin/release/bundle/macos/*.app 2>/dev/null | xargs -n 1 basename 2>/dev/null || echo "")
+          # 정확한 앱 경로 찾기
+          X86_APP_DIR=$(find src-tauri/target/x86_64-apple-darwin/release/bundle -type d -name "*.app" | head -1)
+          AARCH64_APP_DIR=$(find src-tauri/target/aarch64-apple-darwin/release/bundle -type d -name "*.app" | head -1)
           
-          # 앱 이름이 비어있는 경우 다른 경로 구조 시도
-          if [ -z "$APPNAME" ]; then
-            echo "Trying alternative path structure..."
-            APPNAME=$(find src-tauri/target/x86_64-apple-darwin/release/bundle -name "*.app" | xargs -n 1 basename 2>/dev/null || echo "")
-          fi
+          echo "Intel app directory: $X86_APP_DIR"
+          echo "Apple Silicon app directory: $AARCH64_APP_DIR"
           
-          # 앱 이름이 여전히 비어있는 경우 오류 표시
-          if [ -z "$APPNAME" ]; then
-            echo "ERROR: Could not find .app bundle in target directory"
-            echo "Checking all possible locations..."
-            find src-tauri/target -name "*.app"
-            exit 1
-          fi
-          
-          echo "Found app: $APPNAME"
+          # 앱 이름 추출
+          APPNAME=$(basename "$X86_APP_DIR")
           APPBASE=$(basename "$APPNAME" .app)
           
-          # 경로 확인을 위해 인텔 맥 앱의 내부 구조 확인
-          X86_APP_PATH=$(find src-tauri/target/x86_64-apple-darwin/release/bundle -name "$APPNAME" -type d)
-          AARCH64_APP_PATH=$(find src-tauri/target/aarch64-apple-darwin/release/bundle -name "$APPNAME" -type d)
+          echo "App name: $APPNAME"
+          echo "App base name: $APPBASE"
           
-          echo "Intel app path: $X86_APP_PATH"
-          echo "Apple Silicon app path: $AARCH64_APP_PATH"
-          
-          # 앱 내부 구조 검사
-          ls -la "$X86_APP_PATH/Contents/"
+          # 앱 내부 구조 확인
+          echo "Checking app internal structure..."
+          find "$X86_APP_DIR" -type f | grep -v '\.dSYM' | sort
           
           # Universal 앱 디렉토리 생성
           mkdir -p "universal/bundle/macos/$APPNAME/Contents/MacOS"
           
           # 앱 구조 복사
-          cp -r "$X86_APP_PATH/Contents/Info.plist" "universal/bundle/macos/$APPNAME/Contents/"
-          cp -r "$X86_APP_PATH/Contents/Resources" "universal/bundle/macos/$APPNAME/Contents/"
+          cp -r "$X86_APP_DIR/Contents/Info.plist" "universal/bundle/macos/$APPNAME/Contents/"
+          cp -r "$X86_APP_DIR/Contents/Resources" "universal/bundle/macos/$APPNAME/Contents/"
+          
+          # 바이너리 경로 확인
+          X86_BINARY="$X86_APP_DIR/Contents/MacOS/$APPBASE"
+          AARCH64_BINARY="$AARCH64_APP_DIR/Contents/MacOS/$APPBASE"
+          
+          echo "Intel binary path: $X86_BINARY"
+          echo "Apple Silicon binary path: $AARCH64_BINARY"
+          
+          # 바이너리 존재 확인
+          if [ ! -f "$X86_BINARY" ]; then
+            echo "ERROR: Intel binary not found at: $X86_BINARY"
+            exit 1
+          fi
+          
+          if [ ! -f "$AARCH64_BINARY" ]; then
+            echo "ERROR: Apple Silicon binary not found at: $AARCH64_BINARY"
+            exit 1
+          fi
           
           # Universal 바이너리 생성
           lipo -create -output "universal/bundle/macos/$APPNAME/Contents/MacOS/$APPBASE" \
-            "$X86_APP_PATH/Contents/MacOS/$APPBASE" \
-            "$AARCH64_APP_PATH/Contents/MacOS/$APPBASE"
+            "$X86_BINARY" \
+            "$AARCH64_BINARY"
+          
+          echo "Universal binary created successfully"
+          echo "Contents of universal/bundle/macos:"
+          find universal/bundle/macos -type f | sort
       - name: Upload macOS Universal Binary
         uses: actions/upload-artifact@v4
         with:
