@@ -1,12 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { writeTextFile, readTextFile, exists, createDir } from '@tauri-apps/api/fs';
 import { resourceDir, join } from '@tauri-apps/api/path';
-import { open, message, save } from '@tauri-apps/api/dialog';
+import { open, save } from '@tauri-apps/api/dialog';
 import './styles.css';
-
-// --- Target Claude config file path (Hardcoded for now) ---
-const TARGET_CLAUDE_CONFIG_PATH = "/Users/python/Library/Application Support/claude/claude_desktop_config.json";
-// ---------------------------------------------------------
 
 // --- Editor Settings Logic ---
 interface EditorSettings {
