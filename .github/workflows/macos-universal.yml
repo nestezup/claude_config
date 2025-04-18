@@ -1,0 +1,56 @@
+name: macOS Universal Build
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  # 수동으로 워크플로우를 실행할 수도 있게 설정
+  workflow_dispatch:
+
+jobs:
+  build-macos-universal:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Install dependencies
+        run: npm install
+      - name: Add Rust targets for Universal Binary
+        run: |
+          rustup target add aarch64-apple-darwin
+          rustup target add x86_64-apple-darwin
+      - name: Build for Intel Mac (x86_64)
+        run: |
+          npm run tauri build -- --target x86_64-apple-darwin
+      - name: Build for Apple Silicon Mac (aarch64)
+        run: |
+          npm run tauri build -- --target aarch64-apple-darwin
+      - name: Create Universal Binary
+        run: |
+          mkdir -p universal/bundle/macos
+          # Path might need adjustment based on your Tauri config
+          APPNAME=$(ls src-tauri/target/x86_64-apple-darwin/release/bundle/macos/*.app | xargs basename)
+          APPBASE=$(basename "$APPNAME" .app)
+          
+          # Create directories for universal app
+          mkdir -p "universal/bundle/macos/$APPNAME/Contents/MacOS"
+          
+          # Copy app structure from one of the builds
+          cp -r "src-tauri/target/x86_64-apple-darwin/release/bundle/macos/$APPNAME/Contents/Info.plist" "universal/bundle/macos/$APPNAME/Contents/"
+          cp -r "src-tauri/target/x86_64-apple-darwin/release/bundle/macos/$APPNAME/Contents/Resources" "universal/bundle/macos/$APPNAME/Contents/"
+          
+          # Create universal binary
+          lipo -create -output "universal/bundle/macos/$APPNAME/Contents/MacOS/$APPBASE" \
+            "src-tauri/target/x86_64-apple-darwin/release/bundle/macos/$APPNAME/Contents/MacOS/$APPBASE" \
+            "src-tauri/target/aarch64-apple-darwin/release/bundle/macos/$APPNAME/Contents/MacOS/$APPBASE"
+      - name: Upload macOS Universal Binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: macOS-Universal-tauri-build
+          path: |
+            universal/bundle/
