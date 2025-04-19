@@ -511,7 +511,7 @@ function App() {
                     ) : (  
                       <button
                         className="delete-key"
-                        onClick={(e) => {
+                        onClick={() => {
                           // Pass the key to start confirmation mode
                           deleteKey(key);
                         }}
@@ -613,7 +613,7 @@ function App() {
         header {
           padding: 1rem 1.5rem; /* Increased padding */
           background-color: var(--light-bg);
-          border-bottom: 1px solid var(--border-color);
+          border-bottom: 0px solid var(--border-color);
           box-shadow: 0 1px 3px rgba(0,0,0,0.1); /* Subtle shadow */
         }
 
@@ -821,7 +821,7 @@ function App() {
 
         .json-header {
           margin-bottom: 0.75rem; /* Adjusted margin */
-          border-bottom: 1px solid var(--border-color); /* Separator line */
+          border-bottom: 0px solid var(--border-color); /* Separator line */
           padding-bottom: 0.5rem;
         }
 
@@ -925,13 +925,12 @@ function App() {
         }
 
         .action-buttons-group {
-          padding: 0.5rem; /* Match left panel */
           display: flex;
           flex-direction: row;
           justify-content: center;
           /* flex-direction: column; is the default */
           gap: 0.5rem; /* Re-add gap for horizontal spacing */
-          border-top: 1px solid var(--border-color); /* Match left panel */
+          border-top: 0px solid var(--border-color); /* Match left panel */
         }
 
         /* 새로운 삭제 확인 버튼 그룹 */
