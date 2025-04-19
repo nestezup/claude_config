@@ -46,7 +46,7 @@ function App() {
     try {
       return await exists(path);
     } catch (error) {
-      console.error("Error checking file existence:", error);
+      console.error("파일 존재 여부 확인 오류:", error); // Korean Log
       return false;
     }
   }
@@ -67,34 +67,34 @@ function App() {
       // 1. Load Editor Settings (to get target path)
       try {
         const settingsPath = await getEditorSettingsPath();
-        console.log('Attempting to load editor settings from:', settingsPath);
+        console.log('에디터 설정 로딩 시도:', settingsPath); // Korean Log
         if (await existsFile(settingsPath)) {
           const settingsContent = await readTextFile(settingsPath);
           const parsedSettings: EditorSettings = JSON.parse(settingsContent);
           if (parsedSettings.targetPath) {
             loadedTargetPath = parsedSettings.targetPath;
             setActualClaudeConfigPath(loadedTargetPath);
-            console.log('Loaded target path from settings:', loadedTargetPath);
+            console.log('설정에서 타겟 경로 로드:', loadedTargetPath); // Korean Log
           } else {
-            console.log('Editor settings found, but no targetPath saved.');
+            console.log('에디터 설정은 찾았지만 저장된 targetPath가 없습니다.'); // Korean Log
           }
         } else {
-          console.log('Editor settings file not found.');
+          console.log('에디터 설정 파일을 찾을 수 없습니다.'); // Korean Log
         }
       } catch (e) {
-        console.error('Failed to load or parse editor settings:', e);
+        console.error('에디터 설정 로드 또는 파싱 실패:', e); // Korean Log
         // Don't set error state here, just proceed without target path
       }
 
       // 2. Load Presets (from internal app_config.json)
       try {
         const presetsPath = await getPresetFilePath();
-        console.log('Attempting to load presets from:', presetsPath);
+        console.log('프리셋 로딩 시도:', presetsPath); // Korean Log
         if (await existsFile(presetsPath)) {
           const presetsContent = await readTextFile(presetsPath);
           const parsedPresets = JSON.parse(presetsContent);
           setConfigStore(parsedPresets);
-          console.log('Presets loaded successfully.');
+          console.log('프리셋 로딩 성공.'); // Korean Log
           // Select first preset if none is selected and presets exist
           if (!selectedKey && Object.keys(parsedPresets).length > 0) {
             const firstKey = Object.keys(parsedPresets)[0];
@@ -102,12 +102,12 @@ function App() {
             setJsonValue(JSON.stringify(parsedPresets[firstKey] ?? {}, null, 2));
           }
         } else {
-          console.log('Preset file not found. Starting empty.');
+          console.log('프리셋 파일을 찾을 수 없습니다. 비어있는 상태로 시작합니다.'); // Korean Log
           setConfigStore({});
         }
       } catch (e) {
-        console.error('ERROR loading presets:', e);
-        setError(`Failed to load presets: ${e instanceof Error ? e.message : e}`);
+        console.error('프리셋 로딩 오류:', e); // Korean Log
+        setError(`프리셋 로딩 실패: ${e instanceof Error ? e.message : String(e)}`); // Korean Error
         setConfigStore({}); // Reset presets on error
       }
 
@@ -126,15 +126,15 @@ function App() {
       try {
         const configPath = await getPresetFilePath();
         const configDirPath = await resourceDir();
-        console.log('Attempting to auto-save presets to:', configPath);
+        console.log('프리셋 자동 저장 시도:', configPath); // Korean Log
         if (!(await exists(configDirPath))) {
           await createDir(configDirPath, { recursive: true });
-          console.log('Resource directory created:', configDirPath);
+          console.log('리소스 디렉토리 생성:', configDirPath); // Korean Log
         }
         await writeTextFile(configPath, JSON.stringify(configStore, null, 2));
-        console.log('Presets auto-saved successfully:', configPath);
+        console.log('프리셋 자동 저장 성공:', configPath); // Korean Log
       } catch (e) {
-        console.warn('Presets auto-save failed:', e);
+        console.warn('프리셋 자동 저장 실패:', e); // Korean Log
       }
     };
     // Debounce saving maybe? For now, save directly.
@@ -143,7 +143,7 @@ function App() {
 
   // --- Reinstate PRESET management functions ---
   const addNewKey = () => {
-    let baseName = "NewPreset";
+    let baseName = "새 프리셋"; // Korean Default Name
     let newKey = baseName;
     let counter = 1;
     while (configStore[newKey] !== undefined) {
@@ -157,18 +157,33 @@ function App() {
     setEditingKey(newKey); // Immediately edit name
   };
 
-  const deleteKey = (keyToDelete: string) => {
-    if (confirm(`Are you sure you want to delete the preset "${keyToDelete}"?`)) {
-      // Use functional update for safety
-      setConfigStore(currentStore => {
-        const { [keyToDelete]: _, ...newStore } = currentStore;
-        return newStore;
-      });
-      if (selectedKey === keyToDelete) {
-        setSelectedKey(null);
-        setJsonValue('');
-      }
+  const deleteKey = (e: React.MouseEvent<HTMLButtonElement>, keyToDelete: string) => {
+    e.stopPropagation();
+    console.log("1. deleteKey 함수 시작됨, 키:", keyToDelete); // 로그 1
+    // Use window.confirm for simple confirmation
+    if (window.confirm(`프리셋 "${keyToDelete}"을(를) 정말 삭제하시겠습니까?`)) { // Korean Confirm
+      console.log("2. confirm에서 '확인' 누름"); // 로그 2
+      // Schedule the deletion after the confirm dialog is definitely closed
+      // Use setTimeout with 0ms delay to push to the next event loop tick
+      setTimeout(() => {
+        console.log("3. setTimeout 콜백 시작됨 (삭제 실행 직전)", keyToDelete); // 로그 3
+        // Use functional update for safety
+        setConfigStore(currentStore => {
+          const { [keyToDelete]: _, ...newStore } = currentStore;
+          return newStore;
+        });
+        // Also reset selection if the deleted item was selected
+        if (selectedKey === keyToDelete) {
+          setSelectedKey(null);
+          setJsonValue('');
+        }
+        console.log("4. 상태 업데이트 완료됨", keyToDelete); // 로그 4
+      }, 0);
+    } else {
+      console.log("5. confirm에서 '취소' 누름", keyToDelete); // 로그 5
     }
+    // Logic outside the 'if' block will run regardless of confirmation
+    console.log("6. deleteKey 함수 종료됨", keyToDelete); // 로그 6
   };
 
   const handleKeySelect = (key: string) => {
@@ -177,7 +192,7 @@ function App() {
       const currentValue = configStore[key] ?? {};
       setJsonValue(JSON.stringify(currentValue, null, 2));
     } catch (e) {
-      console.error('Error stringifying selected key value:', e);
+      console.error('선택된 키 값 문자열 변환 오류:', e); // Korean Log
       setJsonValue('{}'); // Fallback
     }
     setEditingKey(null);
@@ -202,7 +217,7 @@ function App() {
     }
 
     if (configStore[newKey] !== undefined) {
-      alert(`Preset key "${newKey}" already exists.`);
+      alert(`프리셋 이름 "${newKey}"이(가) 이미 존재합니다.`); // Korean Alert
       setTempKeyName(''); // Reset temp name
       return;
     }
@@ -210,7 +225,11 @@ function App() {
     // Update the key in configStore
     setConfigStore(currentStore => {
       const { [oldKey]: value, ...rest } = currentStore;
-      return { ...rest, [newKey]: value };
+      // Recreate the object preserving order (simple approach)
+      const entries = Object.entries(rest);
+      const index = Object.keys(currentStore).indexOf(oldKey);
+      entries.splice(index, 0, [newKey, value]);
+      return Object.fromEntries(entries);
     });
 
     // If the selected key was the one renamed, update selectedKey
@@ -219,6 +238,7 @@ function App() {
     }
     setTempKeyName(''); // Reset temp name
   };
+
 
   // --- JSON editor change handler ---
   const handleJsonChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -235,11 +255,11 @@ function App() {
         ...prevStore,
         [selectedKey]: parsed
       }));
-      console.log(`Preset '${selectedKey}' updated in memory.`);
-      alert(`Changes applied to preset '${selectedKey}' in memory.`);
+      console.log(`프리셋 '${selectedKey}' 메모리에서 업데이트됨.`); // Korean Log
+      alert(`프리셋 '${selectedKey}' 변경사항이 메모리에 적용되었습니다.`); // Korean Alert
     } catch (e) {
-      console.error('Invalid JSON in editor:', e);
-      alert(`Invalid JSON: ${e instanceof Error ? e.message : e}`);
+      console.error('에디터에 잘못된 JSON:', e); // Korean Log
+      alert(`잘못된 JSON: ${e instanceof Error ? e.message : String(e)}`); // Korean Alert
     }
   };
 
@@ -247,7 +267,7 @@ function App() {
   const exportPresets = async () => {
     try {
       let filePath = await save({
-        title: "Export Presets As",
+        title: "프리셋 내보내기", // Korean Title
         filters: [{ name: 'JSON', extensions: ['json'] }],
         defaultPath: 'presets_export.json'
       });
@@ -256,25 +276,26 @@ function App() {
           filePath = `${filePath}.json`;
         }
         await writeTextFile(filePath, JSON.stringify(configStore, null, 2));
-        alert('Presets exported successfully!');
+        alert('프리셋을 성공적으로 내보냈습니다!'); // Korean Alert
       } else {
-        console.log('Preset export cancelled.');
+        console.log('프리셋 내보내기 취소됨.'); // Korean Log
       }
     } catch (err) {
-      console.error('Failed to export presets:', err);
-      setError(`Export failed: ${err instanceof Error ? err.message : err}`);
+      console.error('프리셋 내보내기 실패:', err); // Korean Log
+      setError(`내보내기 실패: ${err instanceof Error ? err.message : String(err)}`); // Korean Error
+      alert(`내보내기 실패: ${err instanceof Error ? err.message : String(err)}`); // Korean Alert
     }
   };
 
   const importPresets = async () => {
     try {
-      const selected = await open({
-        title: "Import Presets From File",
+      const selectedPath = await open({
+        title: "프리셋 가져오기", // Korean Title
         filters: [{ name: 'JSON', extensions: ['json'] }],
         multiple: false
       });
-      if (selected && typeof selected === 'string') {
-        const content = await readTextFile(selected);
+      if (selectedPath && typeof selectedPath === 'string') {
+        const content = await readTextFile(selectedPath);
         const parsed = JSON.parse(content);
         // Basic validation: check if it's an object
         if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
@@ -288,17 +309,17 @@ function App() {
              setSelectedKey(firstKey);
              setJsonValue(JSON.stringify(parsed[firstKey] ?? {}, null, 2));
           }
-          alert('Presets imported successfully! Existing presets were overwritten.');
+          alert('프리셋을 성공적으로 가져왔습니다! 기존 프리셋을 덮어썼습니다.'); // Korean Alert
         } else {
-          throw new Error('Imported file does not contain a valid preset object.');
+          throw new Error('가져온 파일에 유효한 프리셋 객체가 없습니다.'); // Korean Error
         }
       } else {
-        console.log('Preset import cancelled.');
+        console.log('프리셋 가져오기 취소됨.'); // Korean Log
       }
     } catch (err) {
-      console.error('Failed to import presets:', err);
-      setError(`Import failed: ${err instanceof Error ? err.message : err}`);
-      alert(`Import failed: ${err instanceof Error ? err.message : err}`);
+      console.error('프리셋 가져오기 실패:', err); // Korean Log
+      setError(`가져오기 실패: ${err instanceof Error ? err.message : String(err)}`); // Korean Error
+      alert(`가져오기 실패: ${err instanceof Error ? err.message : String(err)}`); // Korean Alert
     }
   };
 
@@ -306,21 +327,22 @@ function App() {
   const addPresetFromJsonFile = async () => {
     setError(null);
     try {
-      const selected = await open({
-        title: "Add Preset From JSON File",
+      const selectedPath = await open({
+        title: "파일에서 프리셋 추가", // Korean Title
         filters: [{ name: 'JSON', extensions: ['json'] }],
         multiple: false
       });
-      if (selected && typeof selected === 'string') {
-        const content = await readTextFile(selected);
+      if (selectedPath && typeof selectedPath === 'string') {
+        const content = await readTextFile(selectedPath);
         const parsed = JSON.parse(content);
         // Basic validation
         if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-          throw new Error('Selected file does not contain a valid JSON object.');
+          throw new Error('선택한 파일에 유효한 JSON 객체가 없습니다.'); // Korean Error
         }
         // Generate key from filename (similar to previous logic)
-        const pathParts = selected.split(/[\/]/);
-        const filename = pathParts.pop()?.replace(/\.json$/i, '') || 'newPreset';
+        const pathParts = selectedPath.split(/[\/\\]/); // Handle both / and \\ separators
+        const filenameWithExt = pathParts.pop() || '새 프리셋';
+        const filename = filenameWithExt.replace(/\.json$/i, '');
         let keyName = filename;
         let counter = 1;
         while (configStore[keyName] !== undefined) {
@@ -330,67 +352,71 @@ function App() {
         setConfigStore(prevStore => ({ ...prevStore, [keyName]: parsed }));
         setSelectedKey(keyName); // Select the newly added preset
         setJsonValue(JSON.stringify(parsed, null, 2));
-        alert(`Preset "${keyName}" added successfully!`);
+        alert(`프리셋 "${keyName}"을(를) 성공적으로 추가했습니다!`); // Korean Alert
       }
     } catch (err) {
-      console.error('Failed to add preset from file:', err);
-      setError(`Add failed: ${err instanceof Error ? err.message : err}`);
-      alert(`Failed to add preset: ${err instanceof Error ? err.message : err}`);
+      console.error('파일에서 프리셋 추가 실패:', err); // Korean Log
+      setError(`추가 실패: ${err instanceof Error ? err.message : String(err)}`); // Korean Error
+      alert(`프리셋 추가 실패: ${err instanceof Error ? err.message : String(err)}`); // Korean Alert
     }
   };
+
 
   // --- Select and SET Target Claude Path (Save path to settings file) ---
   const selectAndSetActualClaudePath = async () => {
     setError(null);
     try {
-      const selected = await open({
-        title: "Select Target Claude Desktop Configuration File",
+      const selectedPath = await open({
+        title: "클로드 Config 파일 선택", // Korean Title
         filters: [{ name: 'JSON', extensions: ['json'] }],
         multiple: false
       });
-      if (selected && typeof selected === 'string') {
-        console.log('User set target Claude config path:', selected);
-        setActualClaudeConfigPath(selected); // Update state
+      if (selectedPath && typeof selectedPath === 'string') {
+        console.log('사용자가 타겟 클로드 Config 경로 설정:', selectedPath); // Korean Log
+        setActualClaudeConfigPath(selectedPath); // Update state
 
         // --- Save the selected path to editor_settings.json ---
         try {
           const settingsPath = await getEditorSettingsPath();
-          const newSettings: EditorSettings = { targetPath: selected };
+          const newSettings: EditorSettings = { targetPath: selectedPath };
           // Ensure resource directory exists
           const resDir = await resourceDir();
           if (!(await exists(resDir))) {
             await createDir(resDir, { recursive: true });
           }
           await writeTextFile(settingsPath, JSON.stringify(newSettings, null, 2));
-          console.log('Target path saved to editor settings file.');
-          alert('Target Claude config file path set and saved!');
+          console.log('타겟 경로를 에디터 설정 파일에 저장함.'); // Korean Log - Note: This log doesn't contain Config
+          alert('클로드 Config 파일 경로가 설정 및 저장되었습니다!'); // Korean Alert
         } catch (saveError) {
-          console.error('Failed to save target path to settings file:', saveError);
-          setError(`Failed to save target path setting: ${saveError instanceof Error ? saveError.message : saveError}`);
+          console.error('설정 파일에 타겟 경로 저장 실패:', saveError); // Korean Log
+          setError(`타겟 경로 설정 저장 실패: ${saveError instanceof Error ? saveError.message : String(saveError)}`); // Korean Error - Note: This log doesn't contain Config
           // Keep the path in state even if saving fails, but notify user?
+          alert(`타겟 경로를 설정했지만, 설정을 저장하는 데 실패했습니다: ${saveError instanceof Error ? saveError.message : String(saveError)}`); // Korean Alert - Note: This log doesn't contain Config
         }
         // ------------------------------------------------------
 
       } else {
-        console.log('Target path selection cancelled.');
+        console.log('타겟 경로 선택 취소됨.'); // Korean Log
       }
     } catch (err) {
-      console.error('Error selecting target file:', err);
-      setError(`Error selecting target file: ${err instanceof Error ? err.message : err}`);
+      console.error('타겟 파일 선택 오류:', err); // Korean Log - Note: This log doesn't contain Config
+      setError(`타겟 파일 선택 오류: ${err instanceof Error ? err.message : String(err)}`); // Korean Error - Note: This log doesn't contain Config
+      alert(`타겟 파일 선택 오류: ${err instanceof Error ? err.message : String(err)}`); // Korean Alert - Note: This log doesn't contain Config
     }
   };
+
 
   // --- Apply Selected Preset to TARGET Claude config file ---
   const applySelectedPresetToClaude = async () => {
     // --- Check if target path is set ---
     if (!actualClaudeConfigPath) {
-      alert('Error: Target Claude config file path is not set. Please set it using the button in the header.');
-      setError('Target path not set.');
+      alert('오류: 클로드 Config 파일 경로가 설정되지 않았습니다. 상단의 버튼을 사용하여 설정해주세요.'); // Korean Alert
+      setError('타겟 경로가 설정되지 않았습니다.'); // Korean Error - Note: This log doesn't contain Config
       return;
     }
     // ------------------------------------
     if (!selectedKey || configStore[selectedKey] === undefined) {
-      alert('Please select a valid preset to apply.');
+      alert('적용할 유효한 프리셋을 선택하세요.'); // Korean Alert
       return;
     }
 
@@ -399,15 +425,15 @@ function App() {
     try {
       const presetContent = configStore[selectedKey];
       // --- Use the state variable for the path ---
-      console.log(`Attempting to apply preset '${selectedKey}' to target: ${actualClaudeConfigPath}`);
+      console.log(`프리셋 '${selectedKey}'을(를) 타겟에 적용 시도: ${actualClaudeConfigPath}`); // Korean Log
       await writeTextFile(actualClaudeConfigPath, JSON.stringify(presetContent, null, 2));
       // -------------------------------------------
-      console.log('Successfully applied preset to target Claude config file.');
-      alert(`Preset '${selectedKey}' successfully applied to: ${actualClaudeConfigPath}`);
+      console.log('프리셋을 타겟 클로드 Config 파일에 성공적으로 적용함.'); // Korean Log
+      alert(`프리셋 '${selectedKey}'을(를) 성공적으로 ${actualClaudeConfigPath}에 적용했습니다.`); // Korean Alert - Note: This log doesn't contain Config
     } catch (err) {
-      console.error('ERROR applying preset to target file:', err);
-      setError(`Failed to apply preset to Claude config: ${err instanceof Error ? err.message : err}`);
-      alert(`Error applying preset: ${err instanceof Error ? err.message : err}`);
+      console.error('프리셋을 타겟 파일에 적용 중 오류:', err); // Korean Log
+      setError(`클로드 Config에 프리셋 적용 실패: ${err instanceof Error ? err.message : String(err)}`); // Korean Error
+      alert(`프리셋 적용 오류: ${err instanceof Error ? err.message : String(err)}`); // Korean Alert - Note: This log doesn't contain Config
     } finally {
       setIsSavingTarget(false);
     }
@@ -417,21 +443,24 @@ function App() {
   return (
     <div className="container">
       <header>
-        <h1>Claude Config Preset Editor</h1> {/* Title reverted */}
+        {/* Title Changed */}
+        <h1>클로드 설정 프리셋 편집기</h1>
         {/* --- Area to display and set target path --- */}
         <div className="target-path-controls">
-          <span>Target Claude File: </span>
-          <span className="target-path-display">{actualClaudeConfigPath ? actualClaudeConfigPath : "Not Set"}</span>
-          <button onClick={selectAndSetActualClaudePath} disabled={isLoading}>Set Target File</button>
+          <span>클로드 Config 파일:</span> {/* Korean Label */}
+          <span className="target-path-display">{actualClaudeConfigPath ? actualClaudeConfigPath : "설정 안됨"}</span> {/* Korean Text */}
+          <button onClick={selectAndSetActualClaudePath} disabled={isLoading}>타겟 Config 설정</button> {/* Korean Text */}
         </div>
         {/* ------------------------------------------- */}
-        <div className="set-controls"> {/* Grouped preset management buttons */}
-          <button onClick={importPresets} disabled={isLoading}>Import Presets</button>
-          <button onClick={exportPresets} disabled={isLoading}>Export Presets</button>
-          <button onClick={addPresetFromJsonFile} disabled={isLoading}>Add Preset from File</button>
+        {/* Group the preset action buttons */}
+        <div className="preset-actions-group">
+          {/* Tooltips added and Button Text Changed */}
+          <button onClick={importPresets} disabled={isLoading} title="JSON 파일에서 프리셋 가져오기 (기존 프리셋 대체)">프리셋 가져오기</button> {/* Korean Text */}
+          <button onClick={exportPresets} disabled={isLoading} title="현재 모든 프리셋을 JSON 파일로 내보내기">프리셋 내보내기</button> {/* Korean Text */}
         </div>
-        {isLoading && <div className="loading-indicator">Loading Presets...</div>}
-        {error && <div className="error-indicator">Error: {error}</div>}
+        {/* ------------------------------ */}
+        {isLoading && <div className="loading-indicator">프리셋 로딩 중...</div>} {/* Korean Text */}
+        {error && <div className="error-indicator">오류: {error}</div>} {/* Korean Text */}
       </header>
 
       <main>
@@ -466,17 +495,28 @@ function App() {
                     <button
                       className="delete-key"
                       onClick={(e) => {
-                        e.stopPropagation(); // Prevent item selection
-                        deleteKey(key);
+                        deleteKey(e, key);
                       }}
-                      title="Delete preset"
+                      title="프리셋 삭제" // Korean Tooltip
                     >
                       ✕
                     </button>
                   </div>
                 ))}
               </div>
-              <button className="add-key" onClick={addNewKey}>+ Add Preset</button>
+              {/* Group Add buttons at the bottom */}
+              <div className="add-preset-buttons">
+                <button className="add-key" onClick={addNewKey}>+ 새 프리셋 추가</button> {/* Text Updated Slightly */}
+                {/* Moved "Add Preset from File" button here */}
+                <button 
+                  className="add-key add-from-file" 
+                  onClick={addPresetFromJsonFile} 
+                  disabled={isLoading} 
+                  title="JSON 파일에서 단일 프리셋을 목록에 추가하기"
+                >
+                  파일에서 추가
+                </button>
+              </div>
             </div>
 
             <div className="json-panel"> {/* Preset editor panel */}
@@ -487,104 +527,392 @@ function App() {
                     className="json-editor"
                     value={jsonValue}
                     onChange={handleJsonChange}
-                    placeholder={`Edit JSON for preset '${selectedKey}'...`}
+                    placeholder={`'${selectedKey}' 프리셋 JSON 편집...`} // Korean Placeholder
                     disabled={isLoading}
                     spellCheck={false}
                   />
-                  <button
-                    className="apply-button"
-                    onClick={applyJsonChanges}
-                    disabled={isLoading}
-                    title="Apply changes to this preset in memory (will auto-save)"
-                  >
-                    ✔ Apply Changes to Preset
-                  </button>
-                  {/* --- NEW Apply to Claude Button --- */}
-                  <button
-                    className="apply-to-target-button"
-                    onClick={applySelectedPresetToClaude}
-                    disabled={isLoading || isSavingTarget || !selectedKey || !actualClaudeConfigPath}
-                    title={actualClaudeConfigPath ? `Apply the content of '${selectedKey}' preset to ${actualClaudeConfigPath}` : 'Set target Claude config file first'}
-                    style={{ backgroundColor: '#ff9800', marginTop: '0.5rem' }}
-                  >
-                    {isSavingTarget ? 'Applying...' : 'Apply Preset to Claude Config'}
-                  </button>
-                  {/* ------------------------------- */}
+                  {/* Group action buttons similar to left panel */}
+                  <div className="action-buttons-group">
+                    <button
+                        className="apply-button"
+                        onClick={applyJsonChanges}
+                        disabled={isLoading}
+                        title="현재 편집 중인 내용을 이 프리셋에 임시 저장합니다 (자동 저장됨)" // Korean Tooltip
+                    >
+                        ✔ 변경사항 저장 {/* Korean Text */}
+                    </button>
+                    <button
+                        className="apply-to-target-button"
+                        onClick={applySelectedPresetToClaude}
+                        disabled={isLoading || isSavingTarget || !selectedKey || !actualClaudeConfigPath}
+                        title={actualClaudeConfigPath ? `현재 '${selectedKey}' 프리셋의 내용을 ${actualClaudeConfigPath} 파일에 덮어씁니다.` : '먼저 클로드 Config 파일을 지정해야 합니다.'} // Korean Tooltip (Corrected to Config)
+                    >
+                        {isSavingTarget ? '적용 중...' : '클로드 Config에 적용'} {/* Korean Text */}
+                    </button>
+                  </div>
                 </>
               ) : (
                 <div className="no-selection">
-                  {Object.keys(configStore).length > 0 ? 'Select a preset to view/edit' : 'No presets loaded. Import or add a new preset.'}
+                  {Object.keys(configStore).length > 0 ? '보거나 편집할 프리셋을 선택하세요' : '로드된 프리셋이 없습니다. 프리셋을 가져오거나 새로 추가하세요.'} {/* Korean Text */}
                 </div>
               )}
             </div>
           </div>
         ) : null /* Show nothing during initial load, handled by header indicator */}
       </main>
-      {/* Revert styles slightly or use existing ones */} 
+      {/* Improved styles remain */}
       <style>{`
-        /* Basic styles - adjust as needed */
-        .container { height: 100vh; display: flex; flex-direction: column; font-family: sans-serif; }
-        header { padding: 1rem; background-color: #f0f0f0; border-bottom: 1px solid #ccc; }
-        header h1 { margin: 0 0 0.5rem 0; }
-        .set-controls { display: flex; gap: 0.5rem; margin-bottom: 0.5rem; }
-        .loading-indicator, .error-indicator { margin-top: 0.5rem; font-style: italic; }
-        .error-indicator { color: red; }
-        main { flex: 1; display: flex; overflow: hidden; }
-        .editor-layout { display: flex; width: 100%; height: 100%; }
-        .keys-panel { width: 250px; border-right: 1px solid #ccc; display: flex; flex-direction: column; background-color: #f9f9f9; }
-        .keys-list { flex: 1; overflow-y: auto; padding: 0.5rem; }
-        .key-item { display: flex; justify-content: space-between; align-items: center; padding: 0.6rem 0.5rem; margin-bottom: 0.25rem; border-radius: 3px; cursor: pointer; border: 1px solid transparent; }
-        .key-item:hover { background-color: #eef; }
-        .key-item.selected { background-color: #dde; border-color: #aac; }
-        .key-name { flex-grow: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .key-item input[type="text"] { flex-grow: 1; border: 1px solid #99f; padding: 0.2rem; }
-        .delete-key { background: none; border: none; color: #f66; cursor: pointer; font-size: 1.1em; padding: 0 0.3em; visibility: hidden; }
-        .key-item:hover .delete-key, .key-item.selected .delete-key { visibility: visible; }
-        .delete-key:hover { color: #f00; }
-        .add-key { display: block; width: calc(100% - 1rem); margin: 0.5rem; padding: 0.7rem; text-align: center; background-color: #e0e0e0; border: 1px solid #ccc; border-radius: 3px; cursor: pointer; }
-        .add-key:hover { background-color: #d5d5d5; }
-        .json-panel { flex: 1; display: flex; flex-direction: column; padding: 0.5rem; }
-        .json-header { margin-bottom: 0.5rem; }
-        .json-header h3 { margin: 0; }
-        .json-editor { flex: 1; font-family: monospace; font-size: 14px; border: 1px solid #ccc; padding: 0.5rem; resize: none; }
-        .apply-button { margin-top: 0.5rem; background-color: #4CAF50; padding: 0.6rem 1.2rem; align-self: flex-end; }
-        .apply-button:hover { background-color: #388e3c; }
-        .no-selection { display: flex; align-items: center; justify-content: center; height: 100%; color: #666; }
-        button { padding: 0.5rem 1rem; background-color: #2196f3; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9rem; }
-        button:disabled { background-color: #bbdefb; cursor: not-allowed; }
+        /* Improved UI Styles */
+        :root {
+          --primary-color: #007bff; /* Blue */
+          --secondary-color: #6c757d; /* Gray */
+          --success-color: #28a745; /* Green */
+          --warning-color: #ffc107; /* Yellow */
+          --danger-color: #dc3545; /* Red */
+          --light-bg: #f8f9fa;
+          --dark-text: #343a40;
+          --border-color: #dee2e6;
+          --hover-bg: #e9ecef;
+          --selected-bg: #cfe2ff;
+          --selected-border: #9ec5fe;
+          --button-text: #ffffff;
+        }
+
+        body {
+          margin: 0;
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+          color: var(--dark-text);
+          background-color: #fff; /* Changed body background */
+        }
+
+        .container {
+          height: 100vh;
+          display: flex;
+          flex-direction: column;
+        }
+
+        header {
+          padding: 1rem 1.5rem; /* Increased padding */
+          background-color: var(--light-bg);
+          border-bottom: 1px solid var(--border-color);
+          box-shadow: 0 1px 3px rgba(0,0,0,0.1); /* Subtle shadow */
+        }
+
+        header h1 {
+          margin: 0 0 1rem 0; /* Increased bottom margin */
+          font-size: 1.5rem; /* Slightly larger */
+          color: var(--dark-text);
+        }
+
         .target-path-controls {
-           margin-bottom: 0.75rem; 
-           padding: 0.5rem; 
-           background-color: #eee;
-           border-radius: 4px; 
-           display: flex; 
-           align-items: center; 
+           margin-bottom: 1rem; /* Increased margin */
+           padding: 0.75rem; /* Increased padding */
+           background-color: #fff; /* White background */
+           border: 1px solid var(--border-color); /* Added border */
+           border-radius: 6px; /* Slightly more rounded */
+           display: flex;
+           align-items: center;
            gap: 0.75rem;
         }
+        .target-path-controls > span:first-child { /* Target Claude File: label */
+           font-weight: 500;
+           color: var(--secondary-color);
+           white-space: nowrap; /* Prevent label wrapping */
+        }
+
         .target-path-display {
-           font-family: monospace; 
-           font-size: 0.9em; 
-           color: #333; 
-           background-color: #fff; 
-           padding: 0.2rem 0.5rem; 
-           border: 1px solid #ccc;
-           border-radius: 3px;
-           flex-grow: 1; /* Take available space */
+           font-family: monospace;
+           font-size: 0.9em;
+           color: var(--dark-text);
+           background-color: var(--light-bg); /* Lighter bg */
+           padding: 0.4rem 0.6rem; /* Adjusted padding */
+           border: 1px solid var(--border-color);
+           border-radius: 4px; /* Match button radius */
+           flex-grow: 1;
            overflow: hidden;
            text-overflow: ellipsis;
            white-space: nowrap;
         }
-        .apply-to-target-button {
-             /* Add specific styles or inherit from button */
-             padding: 0.6rem 1.2rem;
-             color: white;
-             border: none;
-             border-radius: 4px;
-             cursor: pointer;
-             font-size: 0.9rem; 
-             align-self: flex-end; /* Align with Apply Changes */
+
+        .preset-actions-group {
+           display: flex;
+           gap: 0.75rem;
+           margin-top: 0.75rem; /* Add space above this group */
+         }
+
+        .loading-indicator, .error-indicator {
+          margin-top: 0.75rem;
+          padding: 0.5rem;
+          border-radius: 4px;
         }
-        .apply-to-target-button:disabled { background-color: #ffcc80; cursor: not-allowed; }
+        .loading-indicator {
+          color: var(--secondary-color);
+        }
+        .error-indicator {
+          color: var(--danger-color);
+          background-color: #f8d7da;
+          border: 1px solid #f5c6cb;
+          white-space: pre-wrap; /* Allow error message wrapping */
+        }
+
+        main {
+          flex: 1;
+          display: flex;
+          overflow: hidden;
+        }
+
+        .editor-layout {
+          display: flex;
+          width: 100%;
+          height: 100%;
+        }
+
+        .keys-panel {
+          width: 280px;
+          border-right: 1px solid var(--border-color);
+          display: flex;
+          flex-direction: column;
+          background-color: var(--light-bg);
+          padding: 1rem;
+        }
+
+        .keys-list {
+          flex: 1;
+          overflow-y: auto;
+          padding: 0; /* Explicitly set padding to 0 */
+          /* Padding is now on the parent .keys-panel */
+          /* Remove padding here if needed, or adjust if specific list padding is desired */
+        }
+
+        .key-item {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 0.7rem 0.8rem; /* Increased padding */
+          margin-bottom: 0.3rem;
+          border-radius: 5px; /* Softer corners */
+          cursor: pointer;
+          border: 1px solid transparent;
+          transition: background-color 0.15s ease-in-out, border-color 0.15s ease-in-out; /* Smooth transition */
+        }
+
+        .key-item:hover {
+          background-color: var(--hover-bg);
+          border-color: #ced4da;
+        }
+
+        .key-item.selected {
+          background-color: var(--selected-bg);
+          border-color: var(--selected-border);
+          color: #0a3622; /* Darker text for selected */
+          font-weight: 500; /* Bold selected */
+        }
+        .key-item.selected:hover {
+           background-color: #b9d5ff; /* Slightly darker blue on hover when selected */
+        }
+
+
+        .key-name {
+          flex-grow: 1;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          margin-right: 0.5rem; /* Space before delete button */
+        }
+
+        .key-item input[type="text"] {
+          flex-grow: 1;
+          border: 1px solid var(--primary-color);
+          padding: 0.3rem 0.5rem;
+          border-radius: 4px;
+          outline: none;
+          /* Removed focus shadow for simplicity, border color change is enough */
+        }
+
+        .delete-key {
+          background: none;
+          border: none;
+          color: var(--secondary-color);
+          cursor: pointer;
+          font-size: 1.2em;
+          line-height: 1; /* Align better */
+          padding: 0 0.3em;
+          border-radius: 50%; /* Round button */
+          width: 24px;
+          height: 24px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          visibility: hidden; /* Hide by default */
+          opacity: 0;
+          transition: opacity 0.2s ease, background-color 0.2s ease, color 0.2s ease;
+        }
+
+        .key-item:hover .delete-key, .key-item.selected .delete-key {
+          visibility: visible;
+          opacity: 0.7; /* Make it slightly transparent */
+        }
+        .key-item .delete-key:hover {
+          background-color: rgba(220, 53, 69, 0.1); /* Lighter danger bg on hover */
+          color: var(--danger-color);
+          opacity: 1;
+        }
+
+
+        .add-preset-buttons {
+          display: flex;
+          flex-direction: column; /* Stack buttons vertically */
+          gap: 0.5rem; /* Space between buttons */
+        }
+
+        .add-key {
+          display: block;
+          width: 100%; /* Make buttons full width */
+          margin: 0; /* Remove individual margins */
+          padding: 0.6rem 1.2rem;
+          text-align: center;
+          background-color: #e9ecef; /* Lighter gray */
+          color: var(--dark-text);
+          border-color: #ced4da; /* Use specific border color */
+          border-radius: 4px;
+          cursor: pointer;
+          font-weight: 500;
+          transition: background-color 0.2s ease;
+        }
+
+        .add-key:hover {
+          background-color: #dee2e6; /* Darker on hover */
+        }
+
+        /* Specific style for Add from file button if needed, e.g., slightly different bg */
+        .add-key.add-from-file {
+          /* background-color: #dde; /* Example: slightly different background */
+          /* You can customize this button further if needed */
+        }
+
+        .json-panel {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          padding: 1rem; /* Increased padding */
+          background-color: #ffffff; /* White background for editor area */
+          flex-grow: 1; /* Green button takes 1 part */
+        }
+
+        .json-header {
+          margin-bottom: 0.75rem; /* Adjusted margin */
+          border-bottom: 1px solid var(--border-color); /* Separator line */
+          padding-bottom: 0.5rem;
+        }
+
+        .json-header h3 {
+          margin: 0;
+          font-size: 1.2rem; /* Slightly larger */
+          color: var(--dark-text);
+        }
+
+        .json-editor {
+          flex: 1;
+          font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+          font-size: 14px;
+          line-height: 1.5; /* Better line spacing */
+          border: 1px solid var(--border-color);
+          border-radius: 6px; /* Match target path display */
+          padding: 0.75rem; /* Increased padding */
+          resize: none;
+          margin-bottom: 1rem; /* Space before buttons */
+        }
+        .json-editor:focus {
+          outline: none;
+          border-color: var(--primary-color);
+          box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.25); /* Focus ring */
+        }
+
+        /* General Button Styles */
+        button {
+          padding: 0.6rem 1.2rem;
+          border: 1px solid transparent; /* Add base transparent border for consistent height */
+          border-radius: 4px;
+          cursor: pointer;
+          font-size: 0.90rem; /* Adjusted font size for Korean */
+          font-weight: 500;
+          transition: background-color 0.2s ease, box-shadow 0.2s ease;
+          line-height: 1.4; /* Ensure text vertical align */
+          display: inline-flex; /* Align icon and text if needed */
+          align-items: center;
+          justify-content: center;
+          white-space: nowrap; /* Prevent button text wrapping */
+          box-sizing: border-box; /* Ensure padding and border are included in height/width */
+        }
+
+        button:disabled {
+          cursor: not-allowed;
+          opacity: 0.65;
+        }
+
+        /* Primary Action Button (e.g., Set Target) */
+        button.primary,
+        .preset-actions-group button, /* Apply primary style to these buttons too */
+        .target-path-controls button {
+          background-color: var(--primary-color);
+          color: var(--button-text);
+        }
+        button.primary:not(:disabled):hover,
+        .preset-actions-group button:not(:disabled):hover,
+        .target-path-controls button:not(:disabled):hover {
+          background-color: #0056b3; /* Darker blue */
+          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        /* Success Action Button (Apply Changes) */
+        .apply-button {
+          background-color: var(--success-color);
+          color: var(--button-text);
+          border-color: var(--success-color); /* Keep border consistent */
+          margin: 0; /* Explicitly remove any default/inherited margin */
+        }
+        .apply-button:not(:disabled):hover {
+          background-color: #1e7e34; /* Darker green */
+          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        /* Warning Action Button (Apply to Claude) */
+        .apply-to-target-button {
+             background-color: #ff9800; /* Orange */
+             color: var(--button-text);
+             border-color: #ff9800; /* Keep border consistent */
+        }
+        .apply-to-target-button:not(:disabled):hover {
+           background-color: #e68a00; /* Darker orange */
+           box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .apply-to-target-button:disabled {
+             background-color: #ffcc80; /* Lighter orange when disabled */
+             opacity: 0.7; /* Make slightly more opaque than default disabled */
+         }
+
+        .no-selection {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          text-align: center; /* Center text */
+          height: 100%;
+          color: var(--secondary-color);
+          font-style: italic;
+          background-color: #fff;
+          border-radius: 6px;
+          padding: 1rem; /* Add padding */
+        }
+
+        .action-buttons-group {
+          padding: 0.5rem; /* Match left panel */
+          display: flex;
+          flex-direction: row;
+          justify-content: center;
+          /* flex-direction: column; is the default */
+          gap: 0.5rem; /* Re-add gap for horizontal spacing */
+          border-top: 1px solid var(--border-color); /* Match left panel */
+        }
       `}</style>
     </div>
   );
