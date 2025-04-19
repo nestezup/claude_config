@@ -29,6 +29,8 @@ function App() {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [isSavingTarget, setIsSavingTarget] = useState<boolean>(false); // Saving state for target file
+  // State to track which preset key is pending delete confirmation
+  const [keyToDeleteConfirm, setKeyToDeleteConfirm] = useState<string | null>(null);
 
   // --- NEW State for the actual target Claude config file path ---
   const [actualClaudeConfigPath, setActualClaudeConfigPath] = useState<string | null>(null);
@@ -157,33 +159,29 @@ function App() {
     setEditingKey(newKey); // Immediately edit name
   };
 
-  const deleteKey = (e: React.MouseEvent<HTMLButtonElement>, keyToDelete: string) => {
-    e.stopPropagation();
-    console.log("1. deleteKey 함수 시작됨, 키:", keyToDelete); // 로그 1
-    // Use window.confirm for simple confirmation
-    if (window.confirm(`프리셋 "${keyToDelete}"을(를) 정말 삭제하시겠습니까?`)) { // Korean Confirm
-      console.log("2. confirm에서 '확인' 누름"); // 로그 2
-      // Schedule the deletion after the confirm dialog is definitely closed
-      // Use setTimeout with 0ms delay to push to the next event loop tick
-      setTimeout(() => {
-        console.log("3. setTimeout 콜백 시작됨 (삭제 실행 직전)", keyToDelete); // 로그 3
-        // Use functional update for safety
-        setConfigStore(currentStore => {
-          const { [keyToDelete]: _, ...newStore } = currentStore;
-          return newStore;
-        });
-        // Also reset selection if the deleted item was selected
-        if (selectedKey === keyToDelete) {
-          setSelectedKey(null);
-          setJsonValue('');
-        }
-        console.log("4. 상태 업데이트 완료됨", keyToDelete); // 로그 4
-      }, 0);
-    } else {
-      console.log("5. confirm에서 '취소' 누름", keyToDelete); // 로그 5
+  // Modified deleteKey: Now just sets the key pending confirmation
+  const deleteKey = (keyToConfirm: string) => {
+    setKeyToDeleteConfirm(keyToConfirm);
+  };
+
+  // New function: Actually perform the deletion
+  const confirmDelete = (keyToDelete: string) => {
+    // Use functional update for safety
+    setConfigStore(currentStore => {
+      const { [keyToDelete]: _, ...newStore } = currentStore;
+      return newStore;
+    });
+    // Also reset selection if the deleted item was selected
+    if (selectedKey === keyToDelete) {
+      setSelectedKey(null);
+      setJsonValue('');
     }
-    // Logic outside the 'if' block will run regardless of confirmation
-    console.log("6. deleteKey 함수 종료됨", keyToDelete); // 로그 6
+    setKeyToDeleteConfirm(null); // Exit confirmation mode
+  };
+
+  // New function: Cancel the deletion confirmation
+  const cancelDelete = () => {
+    setKeyToDeleteConfirm(null); // Exit confirmation mode
   };
 
   const handleKeySelect = (key: string) => {
@@ -492,15 +490,36 @@ function App() {
                         {key}
                       </span>
                     )}
-                    <button
-                      className="delete-key"
-                      onClick={(e) => {
-                        deleteKey(e, key);
-                      }}
-                      title="프리셋 삭제" // Korean Tooltip
-                    >
-                      ✕
-                    </button>
+                    {/* Conditional rendering for delete buttons */}  
+                    {keyToDeleteConfirm === key ? (  
+                      <div className="delete-confirm-buttons">  
+                        <button 
+                          className="confirm-btn confirm-delete" 
+                          onClick={() => confirmDelete(key)} 
+                          title="삭제 확인"
+                        >
+                          삭제
+                        </button>  
+                        <button 
+                          className="confirm-btn confirm-cancel" 
+                          onClick={cancelDelete}
+                          title="삭제 취소"
+                        >
+                          취소
+                        </button>  
+                      </div>  
+                    ) : (  
+                      <button
+                        className="delete-key"
+                        onClick={(e) => {
+                          // Pass the key to start confirmation mode
+                          deleteKey(key);
+                        }}
+                        title="프리셋 삭제"
+                      >
+                        ✕
+                      </button>
+                    )}  
                   </div>
                 ))}
               </div>
@@ -745,10 +764,11 @@ function App() {
           justify-content: center;
           visibility: hidden; /* Hide by default */
           opacity: 0;
-          transition: opacity 0.2s ease, background-color 0.2s ease, color 0.2s ease;
+          transition: background-color 0.2s ease, color 0.2s ease, opacity 0.2s ease; /* Add opacity transition back */
         }
 
-        .key-item:hover .delete-key, .key-item.selected .delete-key {
+        .key-item:hover .delete-key,
+        .key-item.selected .delete-key {
           visibility: visible;
           opacity: 0.7; /* Make it slightly transparent */
         }
@@ -912,6 +932,40 @@ function App() {
           /* flex-direction: column; is the default */
           gap: 0.5rem; /* Re-add gap for horizontal spacing */
           border-top: 1px solid var(--border-color); /* Match left panel */
+        }
+
+        /* 새로운 삭제 확인 버튼 그룹 */
+        .delete-confirm-buttons {
+          display: flex;
+          gap: 0.3rem; /* 버튼 사이 간격 */
+        }
+
+        /* 개별 확인/취소 버튼 */
+        .confirm-btn {
+          padding: 0.2rem 0.5rem; /* 작은 크기로 조정 */
+          font-size: 0.8rem; /* 작은 폰트 */
+          border-radius: 3px;
+          border: 1px solid;
+          cursor: pointer;
+          transition: background-color 0.2s ease, color 0.2s ease;
+        }
+
+        .confirm-btn.confirm-delete {
+          background-color: var(--danger-color);
+          border-color: var(--danger-color);
+          color: white;
+        }
+         .confirm-btn.confirm-delete:hover {
+           background-color: #a02633; /* Darker red */
+         }
+
+        .confirm-btn.confirm-cancel {
+           background-color: var(--secondary-color);
+           border-color: var(--secondary-color);
+           color: white;
+        }
+        .confirm-btn.confirm-cancel:hover {
+           background-color: #545b62; /* Darker gray */
         }
       `}</style>
     </div>
