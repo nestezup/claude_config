@@ -63,6 +63,11 @@ jobs:
           releaseBody: 'See the assets to download this version.' # 릴리스 설명
           releaseDraft: true # 초안(Draft)으로 릴리스 생성 (false로 하면 바로 게시)
           prerelease: false
+          # --- 추가/수정할 부분 ---
+          # macOS에서는 universal-apple-darwin 타겟을 명시적으로 지정
+          target: ${{ matrix.platform == 'macos-latest' && 'universal-apple-darwin' || '' }}
+          # ------------------------
+          # Windows는 tauri.conf.json 설정 (nsis)을 따름
           # tauri.conf.json의 targets: ["app", "dmg", "nsis"] 설정에 따라
           # macOS: 유니버설 .app.tar.gz 및 .dmg 생성 및 업로드
           # Windows: .msi (NSIS) 생성 및 업로드 
