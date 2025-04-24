@@ -7,6 +7,11 @@ on:
       - 'v*.*.*' # v1.0.0, v1.2.3 등 버전 태그에 트리거
   workflow_dispatch: # 수동 실행 가능
 
+# --- 추가할 부분 ---
+permissions:
+  contents: write
+# ------------------
+
 jobs:
   publish-tauri:
     strategy:
