@@ -455,6 +455,17 @@ function App() {
           {/* Tooltips added and Button Text Changed */}
           <button onClick={importPresets} disabled={isLoading} title="JSON 파일에서 프리셋 가져오기 (기존 프리셋 대체)">프리셋 가져오기</button> {/* Korean Text */}
           <button onClick={exportPresets} disabled={isLoading} title="현재 모든 프리셋을 JSON 파일로 내보내기">프리셋 내보내기</button> {/* Korean Text */}
+          {/* --- Buy Me a Coffee Link --- */}
+          <a
+            href="https://buymeacoffee.com/mcp_jy" // Updated link
+            target="_blank"
+            rel="noopener noreferrer"
+            className="button buy-me-a-coffee-button" // Apply button styling (new class)
+            title="개발자에게 커피 사주기" // Korean Tooltip
+          >
+            ☕ 커피 사주기 {/* Korean Text */}
+          </a>
+          {/* ---------------------------- */}
         </div>
         {/* ------------------------------ */}
         {isLoading && <div className="loading-indicator">프리셋 로딩 중...</div>} {/* Korean Text */}
@@ -966,6 +977,27 @@ function App() {
         .confirm-btn.confirm-cancel:hover {
            background-color: #545b62; /* Darker gray */
         }
+
+        /* --- New Style for Buy Me a Coffee Button --- */
+        .buy-me-a-coffee-button {
+          background-color: #ffdd00; /* BMAC Yellow */
+          color: #000000; /* Black text */
+          text-decoration: none; /* Remove underline from link */
+          margin-left: auto; /* Push to the right */
+          border-radius: 4px; /* Set border radius */
+          width: 120px; /* Set fixed width */
+          /* Add flex properties for centering content */
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          /* Inherits general button styles like padding, border-radius, etc. */
+        }
+        .buy-me-a-coffee-button:hover {
+          background-color: #e6c800; /* Darker Yellow */
+          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+          color: #000000; /* Ensure text color remains black */
+        }
+        /* ----------------------------------------- */
       `}</style>
     </div>
   );
