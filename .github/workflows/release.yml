@@ -13,25 +13,24 @@ permissions:
 # ------------------
 
 jobs:
-  publish-tauri:
-    strategy:
-      fail-fast: false
-      matrix:
-        # macos-latest와 windows-latest에서 병렬 실행
-        platform: [macos-latest, windows-latest]
-
-    runs-on: ${{ matrix.platform }}
+  # macOS 유니버설 빌드 작업
+  build-macOS:
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
 
       - name: Setup node
         uses: actions/setup-node@v4
         with:
-          node-version: 20 # 사용하시는 Node.js 버전
+          node-version: 20
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
-        # macos-latest에서 실행 시 필요한 target은 tauri-action이 관리 가능
+
+      - name: Add macOS targets for Universal Binary
+        run: |
+          rustup target add aarch64-apple-darwin
+          rustup target add x86_64-apple-darwin
 
       # 의존성 캐싱 (빌드 속도 향상)
       - name: Cache Rust dependencies
@@ -49,25 +48,62 @@ jobs:
             ${{ runner.os }}-node-
 
       - name: Install frontend dependencies
-        # 캐시 미스 시에만 실행
         if: steps.node_cache.outputs.cache-hit != 'true'
         run: npm install
 
-      # tauri-action 사용: 빌드, 릴리스 생성, 아티팩트 업로드 자동화
-      - uses: tauri-apps/tauri-action@v0
+      - name: Build macOS Universal App
+        uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: ${{ github.ref_name }} # 푸시된 태그 이름 사용 (e.g., v1.0.0)
-          releaseName: 'App v__VERSION__' # '__VERSION__'은 앱 버전으로 자동 대체됨
-          releaseBody: 'See the assets to download this version.' # 릴리스 설명
-          releaseDraft: true # 초안(Draft)으로 릴리스 생성 (false로 하면 바로 게시)
+          tagName: ${{ github.ref_name }}
+          releaseName: 'App v__VERSION__'
+          releaseBody: 'See the assets to download this version.'
+          releaseDraft: true
           prerelease: false
-          # --- 추가/수정할 부분 ---
-          # macOS에서는 universal-apple-darwin 타겟을 명시적으로 지정
-          target: ${{ matrix.platform == 'macos-latest' && 'universal-apple-darwin' || '' }}
-          # ------------------------
-          # Windows는 tauri.conf.json 설정 (nsis)을 따름
-          # tauri.conf.json의 targets: ["app", "dmg", "nsis"] 설정에 따라
-          # macOS: 유니버설 .app.tar.gz 및 .dmg 생성 및 업로드
-          # Windows: .msi (NSIS) 생성 및 업로드 
+          args: --target universal-apple-darwin
+
+  # Windows NSIS 빌드 작업
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      # 의존성 캐싱 (빌드 속도 향상)
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - name: Cache node modules
+        id: node_cache
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Install frontend dependencies
+        if: steps.node_cache.outputs.cache-hit != 'true'
+        run: npm install
+
+      - name: Build Windows NSIS Installer
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'App v__VERSION__'
+          releaseBody: 'See the assets to download this version.'
+          releaseDraft: true
+          prerelease: false
+          args: --target nsis 
