@@ -67,7 +67,7 @@
       },
       "resources": [],
       "shortDescription": "",
-      "targets": ["nsis"],
+      "targets": ["app", "dmg", "nsis"],
       "windows": {
         "certificateThumbprint": null,
         "digestAlgorithm": "sha256",

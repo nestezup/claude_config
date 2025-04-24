@@ -1,0 +1,63 @@
+# .github/workflows/release.yml
+name: Release CI
+
+on:
+  push:
+    tags:
+      - 'v*.*.*' # v1.0.0, v1.2.3 등 버전 태그에 트리거
+  workflow_dispatch: # 수동 실행 가능
+
+jobs:
+  publish-tauri:
+    strategy:
+      fail-fast: false
+      matrix:
+        # macos-latest와 windows-latest에서 병렬 실행
+        platform: [macos-latest, windows-latest]
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20 # 사용하시는 Node.js 버전
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        # macos-latest에서 실행 시 필요한 target은 tauri-action이 관리 가능
+
+      # 의존성 캐싱 (빌드 속도 향상)
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - name: Cache node modules
+        id: node_cache
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Install frontend dependencies
+        # 캐시 미스 시에만 실행
+        if: steps.node_cache.outputs.cache-hit != 'true'
+        run: npm install
+
+      # tauri-action 사용: 빌드, 릴리스 생성, 아티팩트 업로드 자동화
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }} # 푸시된 태그 이름 사용 (e.g., v1.0.0)
+          releaseName: 'App v__VERSION__' # '__VERSION__'은 앱 버전으로 자동 대체됨
+          releaseBody: 'See the assets to download this version.' # 릴리스 설명
+          releaseDraft: true # 초안(Draft)으로 릴리스 생성 (false로 하면 바로 게시)
+          prerelease: false
+          # tauri.conf.json의 targets: ["app", "dmg", "nsis"] 설정에 따라
+          # macOS: 유니버설 .app.tar.gz 및 .dmg 생성 및 업로드
+          # Windows: .msi (NSIS) 생성 및 업로드 
